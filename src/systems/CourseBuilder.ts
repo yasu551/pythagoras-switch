@@ -20,6 +20,10 @@ export class CourseBuilder {
   private staticBodies: MatterJS.BodyType[] = [];
   private staticGraphics: Phaser.GameObjects.GameObject[] = [];
   private dynamicPairs: DynamicPair[] = [];
+  private dominoGraphics: Phaser.GameObjects.Shape[] = [];
+  private rampGraphics: Phaser.GameObjects.Shape[] = [];
+  private bucketGraphics: Phaser.GameObjects.Shape[] = [];
+  private bgRect: Phaser.GameObjects.Rectangle | null = null;
   flag!: Phaser.GameObjects.Container;
 
   constructor(scene: Phaser.Scene) {
@@ -49,6 +53,13 @@ export class CourseBuilder {
   }
 
   private buildFloor(): void {
+    // Dark background rectangle (full world)
+    this.bgRect = this.scene.add.rectangle(
+      WORLD.width / 2, WORLD.height / 2,
+      WORLD.width, WORLD.height,
+      0x0a0a0f
+    );
+
     const floor = this.scene.matter.add.rectangle(
       WORLD.width / 2, WORLD.floorY + 15,
       WORLD.width, 30,
@@ -59,8 +70,9 @@ export class CourseBuilder {
     const gfx = this.scene.add.rectangle(
       WORLD.width / 2, WORLD.floorY,
       WORLD.width, 3,
-      0xdddddd
+      0x1a1a2e
     );
+    gfx.setStrokeStyle(1, 0x333344);
     this.staticGraphics.push(gfx);
   }
 
@@ -93,13 +105,16 @@ export class CourseBuilder {
     const color = this.getColor(config.label ?? '');
     const alpha = config.isStatic ? 1.0 : 0.9;
 
+    const strokeColor = this.getStrokeColor(config.label ?? '');
+    const strokeWidth = 2.5; // thicker outlines for dark stage
+
     if (config.type === 'circle') {
       const circle = this.scene.add.circle(
         config.x, config.y,
         config.radius ?? 10,
         color, alpha
       );
-      circle.setStrokeStyle(2, this.getStrokeColor(config.label ?? ''));
+      circle.setStrokeStyle(strokeWidth, strokeColor);
       return circle;
     }
 
@@ -108,7 +123,7 @@ export class CourseBuilder {
       config.width ?? 100, config.height ?? 10,
       color, alpha
     );
-    rect.setStrokeStyle(1.5, this.getStrokeColor(config.label ?? ''));
+    rect.setStrokeStyle(strokeWidth, strokeColor);
     if (config.angle) {
       rect.setAngle(config.angle);
     }
@@ -116,19 +131,23 @@ export class CourseBuilder {
   }
 
   private getColor(label: string): number {
-    if (label === 'ball') return 0xf5c0b0;
-    if (label.startsWith('domino')) return 0xcccccc;
-    if (label.startsWith('ramp')) return 0xdddddd;
-    if (label.startsWith('bucket')) return 0xb0d8d8;
-    if (label.startsWith('platform')) return 0xddd8d0;
-    return 0xdddddd;
+    if (label === 'ball') return 0xff3366;       // hot coral
+    if (label.startsWith('domino')) return 0x2a2a40;
+    if (label.startsWith('ramp')) return 0x1a2a3a;
+    if (label.startsWith('bucket')) return 0x2a1a2a;
+    if (label.startsWith('platform')) return 0x1a2a3a;
+    if (label === 'flag-pole') return 0x1a2a3a;
+    return 0x1a1a2e;
   }
 
   private getStrokeColor(label: string): number {
-    if (label === 'ball') return 0xe85d3a;
-    if (label.startsWith('domino')) return 0x999999;
-    if (label.startsWith('bucket')) return 0x6a9a9a;
-    return 0xbbbbbb;
+    if (label === 'ball') return 0xff3366;
+    if (label.startsWith('domino')) return 0xe8ff00; // acid yellow
+    if (label.startsWith('ramp')) return 0x00f0ff;   // cyan
+    if (label.startsWith('platform')) return 0x00f0ff;
+    if (label.startsWith('bucket')) return 0xff3366;  // coral
+    if (label === 'flag-pole') return 0x333344;
+    return 0x333344;
   }
 
   private buildCourseElements(): void {
@@ -142,6 +161,14 @@ export class CourseBuilder {
       } else {
         this.dynamicPairs.push({ body, graphic });
       }
+
+      // Track graphics for visual cue effects
+      if (config.label?.startsWith('ramp') || config.label?.startsWith('platform')) {
+        this.rampGraphics.push(graphic);
+      }
+      if (config.label?.startsWith('bucket')) {
+        this.bucketGraphics.push(graphic);
+      }
     }
   }
 
@@ -150,6 +177,7 @@ export class CourseBuilder {
       const body = this.createBody(config);
       const graphic = this.createGraphic(config);
       this.dynamicPairs.push({ body, graphic });
+      this.dominoGraphics.push(graphic);
     }
   }
 
@@ -157,9 +185,9 @@ export class CourseBuilder {
     this.ball = this.createBody(BALL);
     this.ballGraphic = this.scene.add.circle(
       BALL.x, BALL.y,
-      BALL.radius ?? 15, 0xf5c0b0
+      BALL.radius ?? 15, 0xff3366 // hot coral
     );
-    this.ballGraphic.setStrokeStyle(2.5, 0xe85d3a);
+    this.ballGraphic.setStrokeStyle(2.5, 0xffffff);
   }
 
   private buildTriggers(): void {
@@ -180,14 +208,14 @@ export class CourseBuilder {
     const x = 1380;
     const y = 590;
 
-    const flagBg = this.scene.add.rectangle(0, 0, 100, 50, 0xffeedd);
-    flagBg.setStrokeStyle(2, 0xe85d3a);
+    const flagBg = this.scene.add.rectangle(0, 0, 100, 50, 0x1a1a2e);
+    flagBg.setStrokeStyle(2, 0x00f0ff);
 
     const flagText = this.scene.add.text(0, 0, 'ピタゴラスイッチ', {
       fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
       fontSize: '11px',
       fontStyle: 'bold',
-      color: '#e85d3a',
+      color: '#00f0ff',
     }).setOrigin(0.5);
 
     this.flag = this.scene.add.container(x + 50, y, [flagBg, flagText]);
@@ -202,5 +230,21 @@ export class CourseBuilder {
       duration: 2000,
       ease: 'Sine.easeOut',
     });
+  }
+
+  getDominoGraphics(): Phaser.GameObjects.Shape[] {
+    return this.dominoGraphics;
+  }
+
+  getRampGraphics(): Phaser.GameObjects.Shape[] {
+    return this.rampGraphics;
+  }
+
+  getBackgroundRect(): Phaser.GameObjects.Rectangle | null {
+    return this.bgRect;
+  }
+
+  getBucketGraphics(): Phaser.GameObjects.Shape[] {
+    return this.bucketGraphics;
   }
 }

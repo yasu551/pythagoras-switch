@@ -43,7 +43,7 @@ export const DIRECTOR_SCRIPT: DirectorEvent[] = [
   },
   {
     label: 'trigger-bucket',
-    camera: { panTo: { x: 1280, y: 500 }, zoom: 1.0, duration: 1200 },
+    camera: { panTo: { x: 1200, y: 560 }, zoom: 1.3, shake: 0.08, duration: 800 },
     sound: { play: 'drop', note: 'E5' },
     timeScale: { value: 0.3, duration: 1500 },
   },

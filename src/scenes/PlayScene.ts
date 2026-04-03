@@ -2,12 +2,14 @@ import Phaser from 'phaser';
 import { CourseBuilder } from '../systems/CourseBuilder';
 import { Director } from '../systems/Director';
 import { SoundManager } from '../systems/SoundManager';
+import { VisualCueManager } from '../systems/VisualCueManager';
 import { WORLD } from '../config/course';
 
 export class PlayScene extends Phaser.Scene {
   private courseBuilder!: CourseBuilder;
   private director!: Director;
   private soundManager!: SoundManager;
+  private visualCueManager!: VisualCueManager;
   private finaleShown = false;
 
   constructor() {
@@ -15,11 +17,8 @@ export class PlayScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.cameras.main.setBackgroundColor('#faf7f2');
+    this.cameras.main.setBackgroundColor('#0a0a0f');
     this.cameras.main.fadeIn(500);
-
-    // Full-world background
-    this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0xfaf7f2);
 
     // Set world bounds for camera
     this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
@@ -30,8 +29,17 @@ export class PlayScene extends Phaser.Scene {
     this.courseBuilder = new CourseBuilder(this);
     this.director = new Director(this, this.soundManager);
 
-    // Build the course
+    // Build the course (includes dark background rect)
     this.courseBuilder.build();
+
+    // Visual effects system
+    this.visualCueManager = new VisualCueManager(this, this.courseBuilder);
+    this.director.setVisualCueManager(this.visualCueManager);
+
+    // Cleanup on scene shutdown (prevents VRAM leaks on restart)
+    this.events.on('shutdown', () => {
+      this.visualCueManager.destroy();
+    });
 
     // HUD
     this.createHUD();
@@ -58,7 +66,7 @@ export class PlayScene extends Phaser.Scene {
       fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
       fontSize: '18px',
       fontStyle: 'bold',
-      color: '#e85d3a',
+      color: '#00f0ff',
     });
     hudTitle.setScrollFactor(0);
     hudTitle.setDepth(100);
@@ -66,6 +74,7 @@ export class PlayScene extends Phaser.Scene {
 
   update(): void {
     this.courseBuilder.update();
+    this.visualCueManager.update();
   }
 
   private showFinale(): void {
@@ -86,7 +95,7 @@ export class PlayScene extends Phaser.Scene {
   private showFinaleOverlay(): void {
     const { width, height } = this.scale;
 
-    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0xf5f0e8, 0.85);
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x0a0a0f, 0.85);
     overlay.setScrollFactor(0);
     overlay.setDepth(200);
     overlay.setAlpha(0);
@@ -95,17 +104,22 @@ export class PlayScene extends Phaser.Scene {
       fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
       fontSize: '56px',
       fontStyle: 'bold',
-      color: '#e85d3a',
+      color: '#ffffff',
       letterSpacing: 10,
     }).setOrigin(0.5);
     title.setScrollFactor(0);
     title.setDepth(201);
     title.setAlpha(0);
 
+    // Add glow to title if WebGL
+    if (this.renderer.type === Phaser.WEBGL) {
+      title.postFX.addGlow(0x00f0ff, 4, 0, false, 0.1, 12);
+    }
+
     const jingleText = this.add.text(width / 2, height / 2 + 40, '♪ ピ・タ・ゴ・ラ・ス・イッ・チ ♪', {
       fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
       fontSize: '18px',
-      color: '#999999',
+      color: '#00f0ff',
       letterSpacing: 3,
     }).setOrigin(0.5);
     jingleText.setScrollFactor(0);
@@ -131,8 +145,8 @@ export class PlayScene extends Phaser.Scene {
       const btn = this.add.text(width / 2, height / 2 + 120, 'もう一度', {
         fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
         fontSize: '20px',
-        color: '#e85d3a',
-        backgroundColor: '#ffffff',
+        color: '#00f0ff',
+        backgroundColor: '#1a1a2e',
         padding: { x: 24, y: 12 },
       }).setOrigin(0.5);
       btn.setScrollFactor(0);
@@ -148,17 +162,17 @@ export class PlayScene extends Phaser.Scene {
       });
 
       btn.on('pointerdown', () => {
-        this.cameras.main.fadeOut(500, 245, 240, 232);
+        this.cameras.main.fadeOut(500, 10, 10, 15);
         this.cameras.main.once('camerafadeoutcomplete', () => {
           this.scene.restart();
         });
       });
 
       btn.on('pointerover', () => {
-        btn.setStyle({ color: '#ffffff', backgroundColor: '#e85d3a' });
+        btn.setStyle({ color: '#1a1a2e', backgroundColor: '#00f0ff' });
       });
       btn.on('pointerout', () => {
-        btn.setStyle({ color: '#e85d3a', backgroundColor: '#ffffff' });
+        btn.setStyle({ color: '#00f0ff', backgroundColor: '#1a1a2e' });
       });
     });
   }

@@ -1,12 +1,14 @@
 import Phaser from 'phaser';
 import { DIRECTOR_SCRIPT, type DirectorEvent } from '../config/director-script';
 import { SoundManager } from './SoundManager';
+import type { VisualCueManager } from './VisualCueManager';
 
 const WATCHDOG_TIMEOUT = 5000; // ms before auto-reset
 
 export class Director {
   private scene: Phaser.Scene;
   private soundManager: SoundManager;
+  private visualCueManager: VisualCueManager | null = null;
   private eventMap: Map<string, DirectorEvent>;
   private firedTriggers: Set<string> = new Set();
   private firstTriggerFired = false;
@@ -23,6 +25,10 @@ export class Director {
     for (const event of DIRECTOR_SCRIPT) {
       this.eventMap.set(event.label, event);
     }
+  }
+
+  setVisualCueManager(vcm: VisualCueManager): void {
+    this.visualCueManager = vcm;
   }
 
   start(): void {
@@ -57,6 +63,9 @@ export class Director {
     this.resetWatchdog();
 
     this.executeEvent(event);
+
+    // Fire visual cue effects
+    this.visualCueManager?.onTrigger(triggerLabel);
 
     // Check if this is the last trigger (bucket = finale)
     if (triggerLabel === 'trigger-bucket') {

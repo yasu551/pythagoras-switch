@@ -8,27 +8,32 @@ export class HomeScene extends Phaser.Scene {
   create(): void {
     const { width, height } = this.scale;
 
-    // Background
-    this.cameras.main.setBackgroundColor('#f5f0e8');
+    // Dark background
+    this.cameras.main.setBackgroundColor('#0a0a0f');
 
-    // Decorative circle
+    // Decorative circle with neon glow
     const circle = this.add.circle(width / 2, height / 2, 150);
-    circle.setStrokeStyle(2, 0xcccccc, 0.3);
+    circle.setStrokeStyle(2, 0x00f0ff, 0.3);
 
     // Title
-    this.add.text(width / 2, height / 2 - 80, 'ピタゴラスイッチ', {
+    const title = this.add.text(width / 2, height / 2 - 80, 'ピタゴラスイッチ', {
       fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
       fontSize: '52px',
       fontStyle: 'bold',
-      color: '#e85d3a',
+      color: '#ffffff',
       letterSpacing: 8,
     }).setOrigin(0.5);
+
+    // Add glow to title if WebGL
+    if (this.renderer.type === Phaser.WEBGL) {
+      title.postFX.addGlow(0x00f0ff, 4, 0, false, 0.1, 12);
+    }
 
     // Subtitle
     this.add.text(width / 2, height / 2 - 30, 'PYTHAGORAS SWITCH', {
       fontFamily: 'sans-serif',
       fontSize: '14px',
-      color: '#999999',
+      color: '#00f0ff',
       letterSpacing: 4,
     }).setOrigin(0.5);
 
@@ -37,13 +42,18 @@ export class HomeScene extends Phaser.Scene {
     const btnX = width / 2;
     const btnY = height / 2 + 80;
 
-    // Button shadow
-    this.add.circle(btnX, btnY + 4, btnRadius, 0xe85d3a, 0.2);
+    // Button shadow (subtle neon)
+    this.add.circle(btnX, btnY + 4, btnRadius, 0xff3366, 0.15);
 
     // Button body
-    const btn = this.add.circle(btnX, btnY, btnRadius, 0xe85d3a);
-    btn.setStrokeStyle(4, 0xc4492d);
+    const btn = this.add.circle(btnX, btnY, btnRadius, 0xff3366);
+    btn.setStrokeStyle(4, 0x00f0ff);
     btn.setInteractive({ useHandCursor: true });
+
+    // Add glow to button if WebGL
+    if (this.renderer.type === Phaser.WEBGL) {
+      btn.postFX.addGlow(0xff3366, 4, 0, false, 0.1, 12);
+    }
 
     // Button text
     const btnText = this.add.text(btnX, btnY, 'スタート', {
@@ -83,8 +93,8 @@ export class HomeScene extends Phaser.Scene {
         snd.context.resume();
       }
 
-      // Fade out and transition
-      this.cameras.main.fadeOut(500, 245, 240, 232);
+      // Fade out to dark
+      this.cameras.main.fadeOut(500, 10, 10, 15);
       this.cameras.main.once('camerafadeoutcomplete', () => {
         this.scene.start('PlayScene');
       });
