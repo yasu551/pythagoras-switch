@@ -171,7 +171,7 @@ export class CourseBuilder {
   }
 
   private buildFlag(): void {
-    const x = 1500;
+    const x = 1380;
     const y = 590;
 
     // Flag body (starts at bottom, will tween upward)

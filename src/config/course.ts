@@ -1,12 +1,10 @@
-// Course layout — simplified, one ball continuous path
+// Course layout — staircase design, maximum reliability
 //
-// Flow: Ball drops → Ramp1 → knocks over Dominoes on tilted platform
-//       → Ball rolls off platform → drops onto Ramp2
-//       → rolls down Ramp2 → drops onto Ramp3
-//       → rolls into Bucket → triggers Flag → ♪ ピタゴラスイッチ ♪
+// All ramps tilt the same direction (left-to-right, top-to-bottom).
+// Each ramp's low end overlaps with the next ramp's high end.
+// No zigzag, no walls, no gaps. The ball never needs to change direction.
 //
-// DESIGN: One ball, continuous path. Every surface connects to the next.
-// Platform is tilted 10deg so ball + dominoes slide off the end.
+// Flow: Ball → Ramp1 → Dominoes on Platform → Ramp2 → Ramp3 → Bucket → Flag
 
 export interface BodyConfig {
   type: 'rectangle' | 'circle' | 'domino';
@@ -32,16 +30,15 @@ export interface TriggerConfig {
 }
 
 export const WORLD = {
-  width: 1800,
+  width: 1600,
   height: 720,
   floorY: 650,
   gravity: { x: 0, y: 2 },
 };
 
-// The ball
 export const BALL: BodyConfig = {
   type: 'circle',
-  x: 100, y: 60,
+  x: 100, y: 50,
   radius: 15,
   label: 'ball',
   friction: 0.0005,
@@ -49,126 +46,114 @@ export const BALL: BodyConfig = {
   density: 0.008,
 };
 
-// Ball2 not used — single ball path
+// Unused — single ball design
 export const BALL2: BodyConfig = {
-  type: 'circle',
-  x: -50, y: -50,
-  radius: 1,
-  label: 'ball2-unused',
-  isStatic: true,
+  type: 'circle', x: -50, y: -50, radius: 1,
+  label: 'ball2-unused', isStatic: true,
 };
-
 export const LAUNCHER: BodyConfig = {
-  type: 'rectangle',
-  x: -50, y: -50,
-  width: 1, height: 1,
-  isStatic: true,
-  label: 'launcher-unused',
+  type: 'rectangle', x: -50, y: -50, width: 1, height: 1,
+  isStatic: true, label: 'launcher-unused',
 };
 
 export const COURSE_BODIES: BodyConfig[] = [
-  // === RAMP 1 (x: 60-380) ===
-  // Ball drops onto the high end. 16 degree slope.
-  // Low end at ~(380, 270).
+  // ============================================================
+  // RAMP 1 (x: 60-400)
+  // Steep entry ramp. Ball gains speed here.
+  // High end: ~(60, 85)  Low end: ~(400, 265)
+  // ============================================================
   {
     type: 'rectangle',
-    x: 220, y: 170,
-    width: 330, height: 14,
-    angle: 16,
+    x: 230, y: 175,
+    width: 350, height: 14,
+    angle: 18,
     isStatic: true,
     label: 'ramp1',
     friction: 0.0005,
   },
 
-  // === DOMINO PLATFORM (x: 380-640) ===
-  // 15 degree slope — steep enough that ball slides through fallen dominoes.
+  // ============================================================
+  // DOMINO PLATFORM (x: 380-620)
+  // Tilted 12 degrees. Ball pushes through dominoes and slides off.
+  // High end overlaps ramp1 low end.
+  // High: ~(380, 258)  Low: ~(620, 308)
+  // ============================================================
   {
     type: 'rectangle',
-    x: 510, y: 300,
-    width: 260, height: 14,
-    angle: 15,
+    x: 500, y: 283,
+    width: 240, height: 14,
+    angle: 12,
     isStatic: true,
     label: 'platform1',
     friction: 0.0005,
   },
 
-  // === RAMP 2 (x: 680-950) ===
-  // Catches ball after it falls off platform1 edge.
-  // High end at ~(720, 370), directly below platform1's right edge.
+  // ============================================================
+  // RAMP 2 (x: 600-900)
+  // Catches ball after platform. Wider ramp = easier catch.
+  // High end overlaps platform1 low end.
+  // High: ~(600, 340)  Low: ~(900, 450)
+  // ============================================================
   {
     type: 'rectangle',
-    x: 820, y: 420,
-    width: 260, height: 14,
+    x: 750, y: 395,
+    width: 310, height: 14,
     angle: 20,
     isStatic: true,
     label: 'ramp2',
     friction: 0.0005,
   },
 
-  // === RAMP 3 (x: 950-1150) ===
-  // Catches ball from ramp2, redirects toward bucket.
-  // Angled the other way (-15deg) to create a zigzag.
+  // ============================================================
+  // RAMP 3 (x: 880-1150)
+  // Final ramp to bucket. Overlaps ramp2 low end.
+  // High: ~(880, 470)  Low: ~(1150, 560)
+  // ============================================================
   {
     type: 'rectangle',
-    x: 1040, y: 510,
-    width: 220, height: 14,
-    angle: -12,
+    x: 1015, y: 515,
+    width: 280, height: 14,
+    angle: 18,
     isStatic: true,
     label: 'ramp3',
     friction: 0.0005,
   },
-  // Wall at left end of ramp3 to catch the ball
-  {
-    type: 'rectangle',
-    x: 928, y: 498,
-    width: 14, height: 40,
-    angle: 0,
-    isStatic: true,
-    label: 'ramp3-wall',
-  },
 
-  // === RAMP 4 (final) ===
-  // Ball rolls off ramp3 right end into bucket below.
+  // ============================================================
+  // BUCKET (x: 1140-1220)
+  // Wide bucket to reliably catch the ball.
+  // ============================================================
   {
     type: 'rectangle',
-    x: 1200, y: 550,
-    width: 160, height: 14,
-    angle: 20,
-    isStatic: true,
-    label: 'ramp4',
-    friction: 0.0005,
-  },
-
-  // === BUCKET ===
-  {
-    type: 'rectangle',
-    x: 1290, y: 595,
-    width: 14, height: 50,
+    x: 1150, y: 590,
+    width: 14, height: 60,
     angle: 0,
     isStatic: true,
     label: 'bucket-left',
   },
   {
     type: 'rectangle',
-    x: 1370, y: 595,
-    width: 14, height: 50,
+    x: 1250, y: 590,
+    width: 14, height: 60,
     angle: 0,
     isStatic: true,
     label: 'bucket-right',
   },
   {
     type: 'rectangle',
-    x: 1330, y: 620,
-    width: 94, height: 14,
+    x: 1200, y: 620,
+    width: 114, height: 14,
     angle: 0,
     isStatic: true,
     label: 'bucket-bottom',
   },
 
-  // === FLAG POLE ===
+  // ============================================================
+  // FLAG POLE
+  // ============================================================
   {
     type: 'rectangle',
-    x: 1500, y: 510,
+    x: 1380, y: 510,
     width: 4, height: 180,
     angle: 0,
     isStatic: true,
@@ -176,25 +161,25 @@ export const COURSE_BODIES: BodyConfig[] = [
   },
 ];
 
-// 4 dominoes. Light, tall, low friction so they slide when fallen.
+// 4 dominoes on tilted platform. Very light so they don't block the ball.
 export const DOMINOES: BodyConfig[] = Array.from({ length: 4 }, (_, i) => ({
   type: 'domino' as const,
   x: 430 + i * 35,
-  y: 250,
+  y: 240,
   width: 12,
   height: 50,
   isStatic: false,
   label: `domino-${i}`,
   friction: 0.05,
   restitution: 0.01,
-  density: 0.0005,
+  density: 0.0004,
 }));
 
 // Trigger sensors
 export const TRIGGERS: TriggerConfig[] = [
   { x: 200, y: 150, width: 50, height: 50, label: 'trigger-ramp1-start' },
-  { x: 420, y: 270, width: 40, height: 50, label: 'trigger-domino-start' },
-  { x: 700, y: 350, width: 50, height: 60, label: 'trigger-domino-end' },
-  { x: 940, y: 500, width: 50, height: 50, label: 'trigger-ramp3' },
-  { x: 1330, y: 590, width: 80, height: 40, label: 'trigger-bucket' },
+  { x: 420, y: 260, width: 40, height: 50, label: 'trigger-domino-start' },
+  { x: 640, y: 330, width: 50, height: 60, label: 'trigger-domino-end' },
+  { x: 850, y: 450, width: 50, height: 50, label: 'trigger-ramp3' },
+  { x: 1200, y: 590, width: 100, height: 50, label: 'trigger-bucket' },
 ];
