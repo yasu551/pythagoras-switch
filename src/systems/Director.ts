@@ -1,156 +1,199 @@
-import Phaser from 'phaser';
-import { DIRECTOR_SCRIPT, type DirectorEvent } from '../config/director-script';
+import RAPIER from '@dimforge/rapier3d-compat';
+import { World } from '../world/World';
+import { CourseBuilder } from '../course/CourseBuilder';
+import { CameraDirector, type CameraKeyframe } from './CameraDirector';
 import { SoundManager } from './SoundManager';
-import type { VisualCueManager } from './VisualCueManager';
+import { TweenManager } from './TweenManager';
+import * as THREE from 'three';
 
-const WATCHDOG_TIMEOUT = 5000; // ms before auto-reset
+interface TriggerDef {
+  position: THREE.Vector3;
+  size: THREE.Vector3;
+  label: string;
+  onEnter: () => void;
+}
+
+const WATCHDOG_TIMEOUT = 4.0; // seconds
 
 export class Director {
-  private scene: Phaser.Scene;
-  private soundManager: SoundManager;
-  private visualCueManager: VisualCueManager | null = null;
-  private eventMap: Map<string, DirectorEvent>;
+  private world: World;
+  private courseBuilder: CourseBuilder;
+  private cameraDirector: CameraDirector;
+  soundManager: SoundManager;
+  tweenManager: TweenManager;
+
+  private triggers: TriggerDef[] = [];
   private firedTriggers: Set<string> = new Set();
-  private firstTriggerFired = false;
-  private watchdogTimer: Phaser.Time.TimerEvent | null = null;
+  private sensorBodies: RAPIER.RigidBody[] = [];
+  private sensorColliders: RAPIER.Collider[] = [];
+  private watchdogTime = 0;
+  private watchdogPaused = false;
   private isFinished = false;
-  onFinish?: () => void;
-  onReset?: () => void;
+  private started = false;
 
-  constructor(scene: Phaser.Scene, soundManager: SoundManager) {
-    this.scene = scene;
+  timeScale = 1.0;
+  onFinale?: () => void;
+
+  constructor(world: World, courseBuilder: CourseBuilder, cameraDirector: CameraDirector, soundManager: SoundManager) {
+    this.world = world;
+    this.courseBuilder = courseBuilder;
+    this.cameraDirector = cameraDirector;
     this.soundManager = soundManager;
-
-    this.eventMap = new Map();
-    for (const event of DIRECTOR_SCRIPT) {
-      this.eventMap.set(event.label, event);
-    }
+    this.tweenManager = new TweenManager();
   }
 
-  setVisualCueManager(vcm: VisualCueManager): void {
-    this.visualCueManager = vcm;
+  setupTriggers(): void {
+    this.triggers = [];
+    this.sensorBodies = [];
+    this.sensorColliders = [];
+
+    // Stage triggers will be added by each stage builder
+    // They call director.addTrigger(...)
+  }
+
+  addTrigger(position: THREE.Vector3, size: THREE.Vector3, label: string, onEnter: () => void): void {
+    this.triggers.push({ position, size, label, onEnter });
+
+    // Create Rapier sensor
+    const bodyDesc = RAPIER.RigidBodyDesc.fixed()
+      .setTranslation(position.x, position.y, position.z);
+    const body = this.world.rapierWorld.createRigidBody(bodyDesc);
+
+    const colliderDesc = RAPIER.ColliderDesc.cuboid(size.x / 2, size.y / 2, size.z / 2)
+      .setSensor(true);
+    const collider = this.world.rapierWorld.createCollider(colliderDesc, body);
+
+    this.sensorBodies.push(body);
+    this.sensorColliders.push(collider);
   }
 
   start(): void {
-    this.firedTriggers.clear();
-    this.firstTriggerFired = false;
+    this.started = true;
     this.isFinished = false;
+    this.firedTriggers.clear();
+    this.watchdogTime = 0;
+    this.watchdogPaused = false;
+    this.timeScale = 1.0;
 
-    // Listen for collision events with trigger sensors
-    this.scene.matter.world.on('collisionstart', this.handleCollision, this);
-  }
-
-  stop(): void {
-    this.scene.matter.world.off('collisionstart', this.handleCollision, this);
-    this.clearWatchdog();
-  }
-
-  private handleCollision = (_event: Phaser.Physics.Matter.Events.CollisionStartEvent, bodyA: MatterJS.BodyType, bodyB: MatterJS.BodyType): void => {
-    if (this.isFinished) return;
-
-    // Check if either body is a trigger sensor
-    const triggerLabel = this.getTriggerLabel(bodyA, bodyB);
-    if (!triggerLabel) return;
-
-    // Don't fire the same trigger twice
-    if (this.firedTriggers.has(triggerLabel)) return;
-    this.firedTriggers.add(triggerLabel);
-
-    const event = this.eventMap.get(triggerLabel);
-    if (!event) return;
-
-    this.firstTriggerFired = true;
-    this.resetWatchdog();
-
-    this.executeEvent(event);
-
-    // Fire visual cue effects
-    this.visualCueManager?.onTrigger(triggerLabel);
-
-    // Check if this is the last trigger (bucket = finale)
-    if (triggerLabel === 'trigger-bucket') {
-      this.triggerFinale();
-    }
-  };
-
-  private getTriggerLabel(bodyA: MatterJS.BodyType, bodyB: MatterJS.BodyType): string | null {
-    if (bodyA.label?.startsWith('trigger-')) return bodyA.label;
-    if (bodyB.label?.startsWith('trigger-')) return bodyB.label;
-    return null;
-  }
-
-  private executeEvent(event: DirectorEvent): void {
-    const camera = this.scene.cameras.main;
-
-    // Camera movement — stop follow mode, Director takes control
-    if (event.camera) {
-      camera.stopFollow();
-      if (event.camera.panTo) {
-        camera.pan(
-          event.camera.panTo.x,
-          event.camera.panTo.y,
-          event.camera.duration,
-          'Sine.easeInOut'
-        );
-      }
-      if (event.camera.zoom != null) {
-        camera.zoomTo(event.camera.zoom, event.camera.duration, 'Sine.easeInOut');
-      }
-      if (event.camera.shake) {
-        camera.shake(300, event.camera.shake);
-      }
-    }
-
-    // Sound
-    if (event.sound) {
-      this.soundManager.playHit(event.sound.play, event.sound.note);
-    }
-
-    // Time scaling (slow-mo)
-    if (event.timeScale) {
-      const engine = (this.scene.matter.world as any).engine as MatterJS.Engine;
-      engine.timing.timeScale = event.timeScale.value;
-
-      this.scene.time.delayedCall(event.timeScale.duration, () => {
-        engine.timing.timeScale = 1;
-      });
-    }
-  }
-
-  private triggerFinale(): void {
-    this.isFinished = true;
-    this.clearWatchdog();
-
-    // Delay slightly for the slow-mo to play out
-    this.scene.time.delayedCall(2500, () => {
-      this.onFinish?.();
+    // Start with a wide establishing shot, then follow ball
+    this.cameraDirector.transitionTo({
+      position: new THREE.Vector3(-2, 13, 12),
+      lookAt: new THREE.Vector3(5, 7, 0),
+      duration: 1500,
+      easing: 'easeOutCubic',
     });
+
+    // After establishing shot, switch to ball follow
+    this.tweenManager.add({
+      from: 0, to: 1, duration: 1, delay: 2000,
+      easing: 'linear', onUpdate: () => {},
+      onComplete: () => {
+        if (this.courseBuilder.ballMesh) {
+          this.cameraDirector.startFollow(
+            this.courseBuilder.ballMesh,
+            new THREE.Vector3(3, 3, 8)
+          );
+        }
+      },
+    });
+  }
+
+  update(dt: number): void {
+    if (!this.started || this.isFinished) return;
+
+    this.tweenManager.update(dt);
+
+    // Check sensor collisions
+    this.checkTriggers();
+
+    // Watchdog
+    if (!this.watchdogPaused) {
+      this.watchdogTime += dt;
+      if (this.watchdogTime > WATCHDOG_TIMEOUT) {
+        const ball = this.courseBuilder.ballBody;
+        if (ball) {
+          const vel = ball.linvel();
+          const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
+          if (speed < 0.05) {
+            console.warn('[Director] Stall detected, resetting...');
+            this.onFinale?.(); // treat as failure -> show replay
+          }
+        }
+      }
+    }
+  }
+
+  private checkTriggers(): void {
+    const ball = this.courseBuilder.ballBody;
+    if (!ball) return;
+
+    const ballPos = ball.translation();
+
+    for (let i = 0; i < this.triggers.length; i++) {
+      const trigger = this.triggers[i];
+      if (this.firedTriggers.has(trigger.label)) continue;
+
+      const dx = Math.abs(ballPos.x - trigger.position.x);
+      const dy = Math.abs(ballPos.y - trigger.position.y);
+      const dz = Math.abs(ballPos.z - trigger.position.z);
+
+      if (dx < trigger.size.x / 2 && dy < trigger.size.y / 2 && dz < trigger.size.z / 2) {
+        this.firedTriggers.add(trigger.label);
+        this.resetWatchdog();
+        trigger.onEnter();
+      }
+    }
+  }
+
+  pauseWatchdog(): void {
+    this.watchdogPaused = true;
+  }
+
+  resumeWatchdog(): void {
+    this.watchdogPaused = false;
+    this.watchdogTime = 0;
   }
 
   private resetWatchdog(): void {
-    this.clearWatchdog();
+    this.watchdogTime = 0;
+  }
 
-    this.watchdogTimer = this.scene.time.delayedCall(WATCHDOG_TIMEOUT, () => {
-      if (!this.isFinished) {
-        console.warn('[Director] Chain stalled, auto-resetting...');
-        this.stop();
-        this.onReset?.();
-      }
+  setTimeScale(scale: number, duration: number): void {
+    this.timeScale = scale;
+    this.tweenManager.add({
+      from: scale,
+      to: 1.0,
+      duration,
+      easing: 'easeOutCubic',
+      onUpdate: (v) => { this.timeScale = v; },
     });
   }
 
-  private clearWatchdog(): void {
-    if (this.watchdogTimer) {
-      this.watchdogTimer.destroy();
-      this.watchdogTimer = null;
-    }
+  triggerCamera(keyframe: CameraKeyframe): void {
+    this.cameraDirector.transitionTo(keyframe);
+  }
+
+  triggerFinale(): void {
+    this.isFinished = true;
+    this.soundManager.playJingle();
+    this.onFinale?.();
   }
 
   reset(): void {
-    this.stop();
-    this.firedTriggers.clear();
-    this.firstTriggerFired = false;
+    this.started = false;
     this.isFinished = false;
-    this.clearWatchdog();
+    this.firedTriggers.clear();
+    this.timeScale = 1.0;
+    this.tweenManager.clear();
+    this.watchdogTime = 0;
+    this.watchdogPaused = false;
+
+    // Clean up sensor bodies
+    for (const body of this.sensorBodies) {
+      this.world.rapierWorld.removeRigidBody(body);
+    }
+    this.sensorBodies = [];
+    this.sensorColliders = [];
+    this.triggers = [];
   }
 }

@@ -1,7 +1,7 @@
 {
   "name": "pythagoras-switch",
-  "version": "1.0.0",
-  "description": "",
+  "version": "2.0.0",
+  "description": "3D Pythagoras Switch with gravity reveal",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -20,8 +20,12 @@
   },
   "homepage": "https://github.com/yasu551/pythagoras-switch#readme",
   "devDependencies": {
-    "phaser": "^3.90.0",
+    "@types/three": "^0.174.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.3"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.14.0",
+    "three": "^0.174.0"
   }
 }

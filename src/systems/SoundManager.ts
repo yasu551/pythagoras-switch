@@ -1,188 +1,132 @@
-import Phaser from 'phaser';
-
-// Note frequencies in Hz
 const NOTE_FREQ: Record<string, number> = {
-  'G4': 392.00,
-  'A4': 440.00,
-  'B4': 493.88,
-  'D5': 587.33,
-  'E5': 659.25,
-  'G5': 783.99,
-  'A5': 880.00,
+  'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
+  'D5': 587.33, 'E5': 659.25, 'G5': 783.99, 'A5': 880.00,
 };
 
-// Jingle sequence: ピ・タ・ゴ・ラ・ス・イッ・チ
 const JINGLE_NOTES = ['G4', 'A4', 'B4', 'D5', 'E5', 'G5', 'A5'];
 
 export class SoundManager {
-  private scene: Phaser.Scene;
   private ctx: AudioContext | null = null;
-  private noteIndex = 0;
 
-  constructor(scene: Phaser.Scene) {
-    this.scene = scene;
-  }
-
-  private getContext(): AudioContext | null {
-    const snd = this.scene.sound as Phaser.Sound.WebAudioSoundManager;
-    if (!snd.context) return null;
-
-    // Try to resume if suspended (may happen if resume() didn't complete before scene transition)
-    if (snd.context.state === 'suspended') {
-      snd.context.resume();
+  resumeContext(): void {
+    if (!this.ctx) {
+      this.ctx = new AudioContext();
     }
-
-    this.ctx = snd.context;
-    return this.ctx;
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
   }
 
   playNote(note: string, duration = 0.3): void {
-    const ctx = this.getContext();
-    if (!ctx) return;
-
+    if (!this.ctx) return;
     const freq = NOTE_FREQ[note];
     if (!freq) return;
 
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
     osc.type = 'sine';
     osc.frequency.value = freq;
-
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-
+    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
     osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + duration);
+    gain.connect(this.ctx.destination);
+    osc.start(this.ctx.currentTime);
+    osc.stop(this.ctx.currentTime + duration);
   }
 
-  playHit(sfxKey: string, note?: string): void {
-    // Play a collision sound effect (synthesized click/knock)
-    this.playSFX(sfxKey);
-
-    // Play the next note in the jingle buildup
-    if (note) {
-      this.playNote(note, 0.4);
-    }
-  }
-
-  private playSFX(key: string): void {
-    const ctx = this.getContext();
-    if (!ctx) return;
-
-    const now = ctx.currentTime;
+  playSFX(key: string): void {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
 
     switch (key) {
       case 'roll': {
-        // Soft rolling sound: low noise burst
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
         osc.type = 'triangle';
         osc.frequency.value = 120;
         gain.gain.setValueAtTime(0.05, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.3);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(now); osc.stop(now + 0.3);
         break;
       }
       case 'click': {
-        // Sharp click for domino hits
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
         osc.type = 'square';
         osc.frequency.value = 800;
         gain.gain.setValueAtTime(0.12, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.08);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(now); osc.stop(now + 0.08);
         break;
       }
-      case 'thwack': {
-        // Heavy thwack for lever
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
+      case 'impact': {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(300, now);
         osc.frequency.exponentialRampToValueAtTime(80, now + 0.15);
         gain.gain.setValueAtTime(0.15, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.2);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(now); osc.stop(now + 0.2);
         break;
       }
-      case 'knock': {
-        // Knock sound for ball hitting ball
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
+      case 'whoosh': {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.value = 500;
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(800, now + 0.2);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(now); osc.stop(now + 0.3);
+        break;
+      }
+      case 'mechanical': {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(60, now);
+        osc.frequency.linearRampToValueAtTime(120, now + 1.5);
         gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(now); osc.stop(now + 2.0);
         break;
       }
       case 'drop': {
-        // Drop into bucket: descending tone
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(600, now);
         osc.frequency.exponentialRampToValueAtTime(200, now + 0.3);
         gain.gain.setValueAtTime(0.1, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.4);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(now); osc.stop(now + 0.4);
         break;
       }
     }
   }
 
   playJingle(): void {
-    const ctx = this.getContext();
-    if (!ctx) return;
-
-    const now = ctx.currentTime;
-    const noteDuration = 0.25;
-    const gap = 0.3;
-
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
     JINGLE_NOTES.forEach((note, i) => {
       const freq = NOTE_FREQ[note];
       if (!freq) return;
-
-      const startTime = now + i * gap;
-
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
+      const start = now + i * 0.3;
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
       osc.type = 'sine';
       osc.frequency.value = freq;
-
-      gain.gain.setValueAtTime(0.2, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + noteDuration);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(startTime);
-      osc.stop(startTime + noteDuration);
+      gain.gain.setValueAtTime(0.2, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+      osc.connect(gain); gain.connect(this.ctx!.destination);
+      osc.start(start); osc.stop(start + 0.25);
     });
-  }
-
-  reset(): void {
-    this.noteIndex = 0;
   }
 }
