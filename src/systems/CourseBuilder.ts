@@ -2,20 +2,24 @@ import Phaser from 'phaser';
 import {
   WORLD,
   BALL,
-  BALL2,
-  LAUNCHER,
   COURSE_BODIES,
   DOMINOES,
   TRIGGERS,
   type BodyConfig,
 } from '../config/course';
 
+interface DynamicPair {
+  body: MatterJS.BodyType;
+  graphic: Phaser.GameObjects.Shape;
+}
+
 export class CourseBuilder {
   private scene: Phaser.Scene;
   ball!: MatterJS.BodyType;
-  ball2!: MatterJS.BodyType;
-  private bodies: MatterJS.BodyType[] = [];
-  private graphics: Phaser.GameObjects.GameObject[] = [];
+  ballGraphic!: Phaser.GameObjects.Arc;
+  private staticBodies: MatterJS.BodyType[] = [];
+  private staticGraphics: Phaser.GameObjects.GameObject[] = [];
+  private dynamicPairs: DynamicPair[] = [];
   flag!: Phaser.GameObjects.Container;
 
   constructor(scene: Phaser.Scene) {
@@ -26,11 +30,22 @@ export class CourseBuilder {
     this.buildFloor();
     this.buildCourseElements();
     this.buildDominoes();
-    this.buildLauncher();
     this.buildBall();
-    this.buildBall2();
     this.buildTriggers();
     this.buildFlag();
+  }
+
+  /** Call every frame to sync dynamic body graphics */
+  update(): void {
+    // Ball
+    if (this.ball && this.ballGraphic) {
+      this.ballGraphic.setPosition(this.ball.position.x, this.ball.position.y);
+    }
+    // Dominoes and other dynamic bodies
+    for (const pair of this.dynamicPairs) {
+      pair.graphic.setPosition(pair.body.position.x, pair.body.position.y);
+      pair.graphic.setRotation(pair.body.angle);
+    }
   }
 
   private buildFloor(): void {
@@ -39,15 +54,14 @@ export class CourseBuilder {
       WORLD.width, 30,
       { isStatic: true, label: 'floor', friction: 0.05 }
     );
-    this.bodies.push(floor);
+    this.staticBodies.push(floor);
 
-    // Visual floor line
     const gfx = this.scene.add.rectangle(
       WORLD.width / 2, WORLD.floorY,
       WORLD.width, 3,
       0xdddddd
     );
-    this.graphics.push(gfx);
+    this.staticGraphics.push(gfx);
   }
 
   private createBody(config: BodyConfig): MatterJS.BodyType {
@@ -75,7 +89,7 @@ export class CourseBuilder {
     );
   }
 
-  private drawBody(config: BodyConfig): void {
+  private createGraphic(config: BodyConfig): Phaser.GameObjects.Shape {
     const color = this.getColor(config.label ?? '');
     const alpha = config.isStatic ? 1.0 : 0.9;
 
@@ -86,74 +100,66 @@ export class CourseBuilder {
         color, alpha
       );
       circle.setStrokeStyle(2, this.getStrokeColor(config.label ?? ''));
-      this.graphics.push(circle);
-    } else {
-      const rect = this.scene.add.rectangle(
-        config.x, config.y,
-        config.width ?? 100, config.height ?? 10,
-        color, alpha
-      );
-      rect.setStrokeStyle(1.5, this.getStrokeColor(config.label ?? ''));
-      if (config.angle) {
-        rect.setAngle(config.angle);
-      }
-      this.graphics.push(rect);
+      return circle;
     }
+
+    const rect = this.scene.add.rectangle(
+      config.x, config.y,
+      config.width ?? 100, config.height ?? 10,
+      color, alpha
+    );
+    rect.setStrokeStyle(1.5, this.getStrokeColor(config.label ?? ''));
+    if (config.angle) {
+      rect.setAngle(config.angle);
+    }
+    return rect;
   }
 
   private getColor(label: string): number {
     if (label === 'ball') return 0xf5c0b0;
-    if (label === 'ball2') return 0xb0d0f5;
     if (label.startsWith('domino')) return 0xcccccc;
     if (label.startsWith('ramp')) return 0xdddddd;
     if (label.startsWith('bucket')) return 0xb0d8d8;
-    if (label === 'launcher') return 0xe8c88a;
-    if (label === 'shelf') return 0xd8d0c0;
     if (label.startsWith('platform')) return 0xddd8d0;
-    if (label.startsWith('seesaw')) return 0xd8d0c0;
     return 0xdddddd;
   }
 
   private getStrokeColor(label: string): number {
     if (label === 'ball') return 0xe85d3a;
-    if (label === 'ball2') return 0x3a7ee8;
     if (label.startsWith('domino')) return 0x999999;
     if (label.startsWith('bucket')) return 0x6a9a9a;
-    if (label === 'launcher') return 0xc8a060;
     return 0xbbbbbb;
   }
 
   private buildCourseElements(): void {
     for (const config of COURSE_BODIES) {
       const body = this.createBody(config);
-      this.bodies.push(body);
-      this.drawBody(config);
+      const graphic = this.createGraphic(config);
+
+      if (config.isStatic !== false) {
+        this.staticBodies.push(body);
+        this.staticGraphics.push(graphic);
+      } else {
+        this.dynamicPairs.push({ body, graphic });
+      }
     }
   }
 
   private buildDominoes(): void {
     for (const config of DOMINOES) {
       const body = this.createBody(config);
-      this.bodies.push(body);
-      this.drawBody(config);
+      const graphic = this.createGraphic(config);
+      this.dynamicPairs.push({ body, graphic });
     }
   }
 
   private buildBall(): void {
     this.ball = this.createBody(BALL);
-    this.bodies.push(this.ball);
-    // Ball visual is drawn in PlayScene update loop (follows physics)
-  }
-
-  private buildBall2(): void {
-    this.ball2 = this.createBody(BALL2);
-    this.bodies.push(this.ball2);
-  }
-
-  private buildLauncher(): void {
-    const body = this.createBody(LAUNCHER);
-    this.bodies.push(body);
-    this.drawBody(LAUNCHER);
+    this.ballGraphic = this.scene.add.circle(
+      BALL.x, BALL.y,
+      BALL.radius ?? 15, 0xf5c0b0
+    );
+    this.ballGraphic.setStrokeStyle(2.5, 0xe85d3a);
   }
 
   private buildTriggers(): void {
@@ -174,7 +180,6 @@ export class CourseBuilder {
     const x = 1380;
     const y = 590;
 
-    // Flag body (starts at bottom, will tween upward)
     const flagBg = this.scene.add.rectangle(0, 0, 100, 50, 0xffeedd);
     flagBg.setStrokeStyle(2, 0xe85d3a);
 
@@ -197,19 +202,5 @@ export class CourseBuilder {
       duration: 2000,
       ease: 'Sine.easeOut',
     });
-  }
-
-  reset(): void {
-    // Remove all physics bodies and recreate
-    for (const body of this.bodies) {
-      this.scene.matter.world.remove(body);
-    }
-    for (const gfx of this.graphics) {
-      gfx.destroy();
-    }
-    this.bodies = [];
-    this.graphics = [];
-    if (this.flag) this.flag.destroy();
-    this.build();
   }
 }

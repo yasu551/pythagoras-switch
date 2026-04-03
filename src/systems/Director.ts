@@ -73,8 +73,9 @@ export class Director {
   private executeEvent(event: DirectorEvent): void {
     const camera = this.scene.cameras.main;
 
-    // Camera movement
+    // Camera movement — stop follow mode, Director takes control
     if (event.camera) {
+      camera.stopFollow();
       if (event.camera.panTo) {
         camera.pan(
           event.camera.panTo.x,

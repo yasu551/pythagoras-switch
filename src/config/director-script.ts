@@ -27,7 +27,7 @@ export const DIRECTOR_SCRIPT: DirectorEvent[] = [
     label: 'trigger-domino-start',
     camera: { panTo: { x: 500, y: 280 }, zoom: 1.3, duration: 600 },
     sound: { play: 'click', note: 'A4' },
-    timeScale: { value: 0.4, duration: 2000 },
+    timeScale: { value: 0.4, duration: 1200 },
   },
   {
     label: 'trigger-domino-end',
@@ -39,12 +39,12 @@ export const DIRECTOR_SCRIPT: DirectorEvent[] = [
     label: 'trigger-ramp3',
     camera: { panTo: { x: 1000, y: 490 }, zoom: 1.15, duration: 700 },
     sound: { play: 'roll', note: 'D5' },
-    timeScale: { value: 0.35, duration: 1200 },
+    timeScale: null,
   },
   {
     label: 'trigger-bucket',
     camera: { panTo: { x: 1280, y: 500 }, zoom: 1.0, duration: 1200 },
     sound: { play: 'drop', note: 'E5' },
-    timeScale: { value: 0.3, duration: 2000 },
+    timeScale: { value: 0.3, duration: 1500 },
   },
 ];

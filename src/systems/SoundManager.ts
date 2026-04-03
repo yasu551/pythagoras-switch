@@ -25,11 +25,15 @@ export class SoundManager {
 
   private getContext(): AudioContext | null {
     const snd = this.scene.sound as Phaser.Sound.WebAudioSoundManager;
-    if (snd.context && snd.context.state === 'running') {
-      this.ctx = snd.context;
-      return this.ctx;
+    if (!snd.context) return null;
+
+    // Try to resume if suspended (may happen if resume() didn't complete before scene transition)
+    if (snd.context.state === 'suspended') {
+      snd.context.resume();
     }
-    return null;
+
+    this.ctx = snd.context;
+    return this.ctx;
   }
 
   playNote(note: string, duration = 0.3): void {

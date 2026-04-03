@@ -2,14 +2,12 @@ import Phaser from 'phaser';
 import { CourseBuilder } from '../systems/CourseBuilder';
 import { Director } from '../systems/Director';
 import { SoundManager } from '../systems/SoundManager';
-import { WORLD, BALL, BALL2 } from '../config/course';
+import { WORLD } from '../config/course';
 
 export class PlayScene extends Phaser.Scene {
   private courseBuilder!: CourseBuilder;
   private director!: Director;
   private soundManager!: SoundManager;
-  private ballGraphic!: Phaser.GameObjects.Arc;
-  private ball2Graphic!: Phaser.GameObjects.Arc;
   private finaleShown = false;
 
   constructor() {
@@ -35,19 +33,17 @@ export class PlayScene extends Phaser.Scene {
     // Build the course
     this.courseBuilder.build();
 
-    // Ball visuals (follow physics bodies in update)
-    this.ballGraphic = this.add.circle(BALL.x, BALL.y, BALL.radius ?? 14, 0xf5c0b0);
-    this.ballGraphic.setStrokeStyle(2, 0xe85d3a);
-
-    this.ball2Graphic = this.add.circle(BALL2.x, BALL2.y, BALL2.radius ?? 12, 0xb0d0f5);
-    this.ball2Graphic.setStrokeStyle(2, 0x3a7ee8);
-
     // HUD
     this.createHUD();
 
-    // Start camera at the beginning
-    this.cameras.main.centerOn(400, 360);
-    this.cameras.main.setZoom(1.0);
+    // Camera starts following the ball, then Director takes over on first trigger
+    this.cameras.main.setZoom(1.1);
+    this.cameras.main.startFollow(
+      this.courseBuilder.ballGraphic,
+      false,
+      0.05, 0.05,  // smooth lerp
+      0, 80        // offset: look slightly ahead and below
+    );
 
     // Director callbacks
     this.director.onFinish = () => this.showFinale();
@@ -58,7 +54,6 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private createHUD(): void {
-    // Title in top-left
     const hudTitle = this.add.text(20, 15, 'ピタゴラスイッチ', {
       fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
       fontSize: '18px',
@@ -70,35 +65,19 @@ export class PlayScene extends Phaser.Scene {
   }
 
   update(): void {
-    // Sync ball graphics with physics bodies
-    if (this.courseBuilder.ball) {
-      this.ballGraphic.setPosition(
-        this.courseBuilder.ball.position.x,
-        this.courseBuilder.ball.position.y
-      );
-    }
-
-    if (this.courseBuilder.ball2) {
-      this.ball2Graphic.setPosition(
-        this.courseBuilder.ball2.position.x,
-        this.courseBuilder.ball2.position.y
-      );
-    }
+    this.courseBuilder.update();
   }
 
   private showFinale(): void {
     if (this.finaleShown) return;
     this.finaleShown = true;
 
-    // Raise the flag
     this.courseBuilder.raiseFlag();
 
-    // Play the jingle after flag starts rising
     this.time.delayedCall(500, () => {
       this.soundManager.playJingle();
     });
 
-    // Show finale overlay after jingle
     this.time.delayedCall(3000, () => {
       this.showFinaleOverlay();
     });
@@ -107,13 +86,11 @@ export class PlayScene extends Phaser.Scene {
   private showFinaleOverlay(): void {
     const { width, height } = this.scale;
 
-    // Semi-transparent overlay (fixed to camera)
     const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0xf5f0e8, 0.85);
     overlay.setScrollFactor(0);
     overlay.setDepth(200);
     overlay.setAlpha(0);
 
-    // Title text
     const title = this.add.text(width / 2, height / 2 - 30, 'ピタゴラスイッチ', {
       fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
       fontSize: '56px',
@@ -125,7 +102,6 @@ export class PlayScene extends Phaser.Scene {
     title.setDepth(201);
     title.setAlpha(0);
 
-    // Jingle text
     const jingleText = this.add.text(width / 2, height / 2 + 40, '♪ ピ・タ・ゴ・ラ・ス・イッ・チ ♪', {
       fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
       fontSize: '18px',
@@ -136,7 +112,6 @@ export class PlayScene extends Phaser.Scene {
     jingleText.setDepth(201);
     jingleText.setAlpha(0);
 
-    // Fade in overlay
     this.tweens.add({
       targets: overlay,
       alpha: 0.85,
@@ -152,10 +127,8 @@ export class PlayScene extends Phaser.Scene {
       ease: 'Sine.easeOut',
     });
 
-    // Replay button after delay
     this.time.delayedCall(3000, () => {
-      const btnY = height / 2 + 120;
-      const btn = this.add.text(width / 2, btnY, 'もう一度', {
+      const btn = this.add.text(width / 2, height / 2 + 120, 'もう一度', {
         fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
         fontSize: '20px',
         color: '#e85d3a',
