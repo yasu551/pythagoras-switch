@@ -1,0 +1,196 @@
+import Phaser from 'phaser';
+import { CourseBuilder } from '../systems/CourseBuilder';
+import { Director } from '../systems/Director';
+import { SoundManager } from '../systems/SoundManager';
+import { WORLD, BALL, BALL2 } from '../config/course';
+
+export class PlayScene extends Phaser.Scene {
+  private courseBuilder!: CourseBuilder;
+  private director!: Director;
+  private soundManager!: SoundManager;
+  private ballGraphic!: Phaser.GameObjects.Arc;
+  private ball2Graphic!: Phaser.GameObjects.Arc;
+  private finaleShown = false;
+
+  constructor() {
+    super({ key: 'PlayScene' });
+  }
+
+  create(): void {
+    this.cameras.main.setBackgroundColor('#faf7f2');
+    this.cameras.main.fadeIn(500);
+
+    // Full-world background
+    this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0xfaf7f2);
+
+    // Set world bounds for camera
+    this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
+    this.matter.world.setBounds(0, 0, WORLD.width, WORLD.height);
+
+    // Initialize systems
+    this.soundManager = new SoundManager(this);
+    this.courseBuilder = new CourseBuilder(this);
+    this.director = new Director(this, this.soundManager);
+
+    // Build the course
+    this.courseBuilder.build();
+
+    // Ball visuals (follow physics bodies in update)
+    this.ballGraphic = this.add.circle(BALL.x, BALL.y, BALL.radius ?? 14, 0xf5c0b0);
+    this.ballGraphic.setStrokeStyle(2, 0xe85d3a);
+
+    this.ball2Graphic = this.add.circle(BALL2.x, BALL2.y, BALL2.radius ?? 12, 0xb0d0f5);
+    this.ball2Graphic.setStrokeStyle(2, 0x3a7ee8);
+
+    // HUD
+    this.createHUD();
+
+    // Start camera at the beginning
+    this.cameras.main.centerOn(400, 360);
+    this.cameras.main.setZoom(1.0);
+
+    // Director callbacks
+    this.director.onFinish = () => this.showFinale();
+    this.director.onReset = () => this.resetCourse();
+
+    // Start the director
+    this.director.start();
+  }
+
+  private createHUD(): void {
+    // Title in top-left
+    const hudTitle = this.add.text(20, 15, 'ピタゴラスイッチ', {
+      fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
+      fontSize: '18px',
+      fontStyle: 'bold',
+      color: '#e85d3a',
+    });
+    hudTitle.setScrollFactor(0);
+    hudTitle.setDepth(100);
+  }
+
+  update(): void {
+    // Sync ball graphics with physics bodies
+    if (this.courseBuilder.ball) {
+      this.ballGraphic.setPosition(
+        this.courseBuilder.ball.position.x,
+        this.courseBuilder.ball.position.y
+      );
+    }
+
+    if (this.courseBuilder.ball2) {
+      this.ball2Graphic.setPosition(
+        this.courseBuilder.ball2.position.x,
+        this.courseBuilder.ball2.position.y
+      );
+    }
+  }
+
+  private showFinale(): void {
+    if (this.finaleShown) return;
+    this.finaleShown = true;
+
+    // Raise the flag
+    this.courseBuilder.raiseFlag();
+
+    // Play the jingle after flag starts rising
+    this.time.delayedCall(500, () => {
+      this.soundManager.playJingle();
+    });
+
+    // Show finale overlay after jingle
+    this.time.delayedCall(3000, () => {
+      this.showFinaleOverlay();
+    });
+  }
+
+  private showFinaleOverlay(): void {
+    const { width, height } = this.scale;
+
+    // Semi-transparent overlay (fixed to camera)
+    const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0xf5f0e8, 0.85);
+    overlay.setScrollFactor(0);
+    overlay.setDepth(200);
+    overlay.setAlpha(0);
+
+    // Title text
+    const title = this.add.text(width / 2, height / 2 - 30, 'ピタゴラスイッチ', {
+      fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
+      fontSize: '56px',
+      fontStyle: 'bold',
+      color: '#e85d3a',
+      letterSpacing: 10,
+    }).setOrigin(0.5);
+    title.setScrollFactor(0);
+    title.setDepth(201);
+    title.setAlpha(0);
+
+    // Jingle text
+    const jingleText = this.add.text(width / 2, height / 2 + 40, '♪ ピ・タ・ゴ・ラ・ス・イッ・チ ♪', {
+      fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
+      fontSize: '18px',
+      color: '#999999',
+      letterSpacing: 3,
+    }).setOrigin(0.5);
+    jingleText.setScrollFactor(0);
+    jingleText.setDepth(201);
+    jingleText.setAlpha(0);
+
+    // Fade in overlay
+    this.tweens.add({
+      targets: overlay,
+      alpha: 0.85,
+      duration: 800,
+      ease: 'Sine.easeOut',
+    });
+
+    this.tweens.add({
+      targets: [title, jingleText],
+      alpha: 1,
+      duration: 1000,
+      delay: 400,
+      ease: 'Sine.easeOut',
+    });
+
+    // Replay button after delay
+    this.time.delayedCall(3000, () => {
+      const btnY = height / 2 + 120;
+      const btn = this.add.text(width / 2, btnY, 'もう一度', {
+        fontFamily: '"Hiragino Sans", "Noto Sans JP", sans-serif',
+        fontSize: '20px',
+        color: '#e85d3a',
+        backgroundColor: '#ffffff',
+        padding: { x: 24, y: 12 },
+      }).setOrigin(0.5);
+      btn.setScrollFactor(0);
+      btn.setDepth(202);
+      btn.setAlpha(0);
+      btn.setInteractive({ useHandCursor: true });
+
+      this.tweens.add({
+        targets: btn,
+        alpha: 1,
+        duration: 500,
+        ease: 'Sine.easeOut',
+      });
+
+      btn.on('pointerdown', () => {
+        this.cameras.main.fadeOut(500, 245, 240, 232);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          this.scene.restart();
+        });
+      });
+
+      btn.on('pointerover', () => {
+        btn.setStyle({ color: '#ffffff', backgroundColor: '#e85d3a' });
+      });
+      btn.on('pointerout', () => {
+        btn.setStyle({ color: '#e85d3a', backgroundColor: '#ffffff' });
+      });
+    });
+  }
+
+  private resetCourse(): void {
+    this.scene.restart();
+  }
+}

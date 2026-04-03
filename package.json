@@ -1,0 +1,27 @@
+{
+  "name": "pythagoras-switch",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yasu551/pythagoras-switch.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/yasu551/pythagoras-switch/issues"
+  },
+  "homepage": "https://github.com/yasu551/pythagoras-switch#readme",
+  "devDependencies": {
+    "phaser": "^3.90.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3"
+  }
+}
