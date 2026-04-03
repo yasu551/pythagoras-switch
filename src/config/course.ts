@@ -1,5 +1,12 @@
-// Course layout configuration
-// All positions are in world coordinates (canvas is 1280x720, world extends to ~3000px wide)
+// Course layout — simplified, one ball continuous path
+//
+// Flow: Ball drops → Ramp1 → knocks over Dominoes on tilted platform
+//       → Ball rolls off platform → drops onto Ramp2
+//       → rolls down Ramp2 → drops onto Ramp3
+//       → rolls into Bucket → triggers Flag → ♪ ピタゴラスイッチ ♪
+//
+// DESIGN: One ball, continuous path. Every surface connects to the next.
+// Platform is tilted 10deg so ball + dominoes slide off the end.
 
 export interface BodyConfig {
   type: 'rectangle' | 'circle' | 'domino';
@@ -8,7 +15,7 @@ export interface BodyConfig {
   width?: number;
   height?: number;
   radius?: number;
-  angle?: number;        // degrees
+  angle?: number;
   isStatic?: boolean;
   label?: string;
   friction?: number;
@@ -25,155 +32,169 @@ export interface TriggerConfig {
 }
 
 export const WORLD = {
-  width: 2800,
+  width: 1800,
   height: 720,
   floorY: 650,
   gravity: { x: 0, y: 2 },
 };
 
-// The ball (protagonist)
+// The ball
 export const BALL: BodyConfig = {
   type: 'circle',
-  x: 170,
-  y: 160,
-  radius: 14,
+  x: 100, y: 60,
+  radius: 15,
   label: 'ball',
-  friction: 0.001,
+  friction: 0.0005,
   restitution: 0.3,
-  density: 0.004,
+  density: 0.008,
 };
 
-// Static course elements
+// Ball2 not used — single ball path
+export const BALL2: BodyConfig = {
+  type: 'circle',
+  x: -50, y: -50,
+  radius: 1,
+  label: 'ball2-unused',
+  isStatic: true,
+};
+
+export const LAUNCHER: BodyConfig = {
+  type: 'rectangle',
+  x: -50, y: -50,
+  width: 1, height: 1,
+  isStatic: true,
+  label: 'launcher-unused',
+};
+
 export const COURSE_BODIES: BodyConfig[] = [
-  // Ramp 1: ball rolls down this
+  // === RAMP 1 (x: 60-380) ===
+  // Ball drops onto the high end. 16 degree slope.
+  // Low end at ~(380, 270).
   {
     type: 'rectangle',
-    x: 300, y: 220,
-    width: 300, height: 10,
-    angle: 15,
+    x: 220, y: 170,
+    width: 330, height: 14,
+    angle: 16,
     isStatic: true,
     label: 'ramp1',
-    friction: 0.002,
+    friction: 0.0005,
   },
-  // Small ledge to slow the ball before dominoes
+
+  // === DOMINO PLATFORM (x: 380-640) ===
+  // 15 degree slope — steep enough that ball slides through fallen dominoes.
   {
     type: 'rectangle',
-    x: 490, y: 305,
-    width: 60, height: 10,
-    angle: 0,
+    x: 510, y: 300,
+    width: 260, height: 14,
+    angle: 15,
     isStatic: true,
-    label: 'ledge1',
-    friction: 0.01,
+    label: 'platform1',
+    friction: 0.0005,
   },
-  // Ramp 2: after dominoes, ball rolls onto this
+
+  // === RAMP 2 (x: 680-950) ===
+  // Catches ball after it falls off platform1 edge.
+  // High end at ~(720, 370), directly below platform1's right edge.
   {
     type: 'rectangle',
-    x: 900, y: 390,
-    width: 250, height: 10,
-    angle: 12,
+    x: 820, y: 420,
+    width: 260, height: 14,
+    angle: 20,
     isStatic: true,
     label: 'ramp2',
-    friction: 0.002,
+    friction: 0.0005,
   },
-  // Platform for lever
+
+  // === RAMP 3 (x: 950-1150) ===
+  // Catches ball from ramp2, redirects toward bucket.
+  // Angled the other way (-15deg) to create a zigzag.
   {
     type: 'rectangle',
-    x: 1100, y: 470,
-    width: 60, height: 10,
-    angle: 0,
-    isStatic: true,
-    label: 'lever-platform',
-    friction: 0.05,
-  },
-  // Ramp 3: ball launched by lever lands here
-  {
-    type: 'rectangle',
-    x: 1400, y: 350,
-    width: 200, height: 10,
-    angle: 18,
+    x: 1040, y: 510,
+    width: 220, height: 14,
+    angle: -12,
     isStatic: true,
     label: 'ramp3',
-    friction: 0.002,
+    friction: 0.0005,
   },
-  // Shelf for Ball 2
+  // Wall at left end of ramp3 to catch the ball
   {
     type: 'rectangle',
-    x: 1650, y: 440,
-    width: 80, height: 10,
+    x: 928, y: 498,
+    width: 14, height: 40,
     angle: 0,
     isStatic: true,
-    label: 'shelf',
-    friction: 0.05,
+    label: 'ramp3-wall',
   },
-  // Bucket walls
+
+  // === RAMP 4 (final) ===
+  // Ball rolls off ramp3 right end into bucket below.
   {
     type: 'rectangle',
-    x: 1920, y: 560,
-    width: 10, height: 60,
+    x: 1200, y: 550,
+    width: 160, height: 14,
+    angle: 20,
+    isStatic: true,
+    label: 'ramp4',
+    friction: 0.0005,
+  },
+
+  // === BUCKET ===
+  {
+    type: 'rectangle',
+    x: 1290, y: 595,
+    width: 14, height: 50,
     angle: 0,
     isStatic: true,
     label: 'bucket-left',
   },
   {
     type: 'rectangle',
-    x: 2000, y: 560,
-    width: 10, height: 60,
+    x: 1370, y: 595,
+    width: 14, height: 50,
     angle: 0,
     isStatic: true,
     label: 'bucket-right',
   },
   {
     type: 'rectangle',
-    x: 1960, y: 590,
-    width: 90, height: 10,
+    x: 1330, y: 620,
+    width: 94, height: 14,
     angle: 0,
     isStatic: true,
     label: 'bucket-bottom',
   },
-  // Flag pole
+
+  // === FLAG POLE ===
   {
     type: 'rectangle',
-    x: 2200, y: 500,
-    width: 4, height: 160,
+    x: 1500, y: 510,
+    width: 4, height: 180,
     angle: 0,
     isStatic: true,
     label: 'flag-pole',
   },
 ];
 
-// Dominoes: thin tall rectangles in a row
-export const DOMINOES: BodyConfig[] = Array.from({ length: 7 }, (_, i) => ({
+// 4 dominoes. Light, tall, low friction so they slide when fallen.
+export const DOMINOES: BodyConfig[] = Array.from({ length: 4 }, (_, i) => ({
   type: 'domino' as const,
-  x: 550 + i * 35,
-  y: 285,
-  width: 10,
-  height: 45,
+  x: 430 + i * 35,
+  y: 250,
+  width: 12,
+  height: 50,
   isStatic: false,
   label: `domino-${i}`,
-  friction: 0.3,
-  restitution: 0.05,
-  density: 0.003,
+  friction: 0.05,
+  restitution: 0.01,
+  density: 0.0005,
 }));
 
-// Ball 2: sits on the shelf, gets knocked into bucket
-export const BALL2: BodyConfig = {
-  type: 'circle',
-  x: 1650,
-  y: 420,
-  radius: 12,
-  label: 'ball2',
-  friction: 0.01,
-  restitution: 0.2,
-  density: 0.003,
-};
-
-// Trigger sensors (invisible, fire Director events)
+// Trigger sensors
 export const TRIGGERS: TriggerConfig[] = [
-  { x: 300, y: 200, width: 40, height: 40, label: 'trigger-ramp1-start' },
-  { x: 520, y: 280, width: 40, height: 40, label: 'trigger-domino-start' },
-  { x: 780, y: 310, width: 40, height: 40, label: 'trigger-domino-end' },
-  { x: 1050, y: 440, width: 40, height: 40, label: 'trigger-lever' },
-  { x: 1350, y: 330, width: 40, height: 40, label: 'trigger-ramp3' },
-  { x: 1630, y: 420, width: 40, height: 60, label: 'trigger-shelf' },
-  { x: 1960, y: 550, width: 80, height: 40, label: 'trigger-bucket' },
+  { x: 200, y: 150, width: 50, height: 50, label: 'trigger-ramp1-start' },
+  { x: 420, y: 270, width: 40, height: 50, label: 'trigger-domino-start' },
+  { x: 700, y: 350, width: 50, height: 60, label: 'trigger-domino-end' },
+  { x: 940, y: 500, width: 50, height: 50, label: 'trigger-ramp3' },
+  { x: 1330, y: 590, width: 80, height: 40, label: 'trigger-bucket' },
 ];

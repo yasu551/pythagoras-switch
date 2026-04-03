@@ -3,11 +3,11 @@ import {
   WORLD,
   BALL,
   BALL2,
+  LAUNCHER,
   COURSE_BODIES,
   DOMINOES,
   TRIGGERS,
   type BodyConfig,
-  type TriggerConfig,
 } from '../config/course';
 
 export class CourseBuilder {
@@ -26,6 +26,7 @@ export class CourseBuilder {
     this.buildFloor();
     this.buildCourseElements();
     this.buildDominoes();
+    this.buildLauncher();
     this.buildBall();
     this.buildBall2();
     this.buildTriggers();
@@ -106,6 +107,10 @@ export class CourseBuilder {
     if (label.startsWith('domino')) return 0xcccccc;
     if (label.startsWith('ramp')) return 0xdddddd;
     if (label.startsWith('bucket')) return 0xb0d8d8;
+    if (label === 'launcher') return 0xe8c88a;
+    if (label === 'shelf') return 0xd8d0c0;
+    if (label.startsWith('platform')) return 0xddd8d0;
+    if (label.startsWith('seesaw')) return 0xd8d0c0;
     return 0xdddddd;
   }
 
@@ -114,6 +119,7 @@ export class CourseBuilder {
     if (label === 'ball2') return 0x3a7ee8;
     if (label.startsWith('domino')) return 0x999999;
     if (label.startsWith('bucket')) return 0x6a9a9a;
+    if (label === 'launcher') return 0xc8a060;
     return 0xbbbbbb;
   }
 
@@ -144,6 +150,12 @@ export class CourseBuilder {
     this.bodies.push(this.ball2);
   }
 
+  private buildLauncher(): void {
+    const body = this.createBody(LAUNCHER);
+    this.bodies.push(body);
+    this.drawBody(LAUNCHER);
+  }
+
   private buildTriggers(): void {
     for (const trigger of TRIGGERS) {
       this.scene.matter.add.rectangle(
@@ -159,8 +171,8 @@ export class CourseBuilder {
   }
 
   private buildFlag(): void {
-    const x = 2200;
-    const y = 580;
+    const x = 1500;
+    const y = 590;
 
     // Flag body (starts at bottom, will tween upward)
     const flagBg = this.scene.add.rectangle(0, 0, 100, 50, 0xffeedd);
